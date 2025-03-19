@@ -43,5 +43,4 @@ library
   exposed-modules:
     Data.Json.Rpc.Endpoint
     Data.Json.Rpc.Endpoint.Internal
-    Data.Json.Rpc.Method
     Data.Json.Rpc.Types
