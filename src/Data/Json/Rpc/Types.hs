@@ -31,6 +31,7 @@ where
 
 import Data.Aeson ((.:), (.:?), (.=), (.?=))
 import qualified Data.Aeson as Aeson
+import Data.Bifunctor (Bifunctor (..))
 import Data.Foldable (asum)
 import Data.Proxy (Proxy (..))
 import Data.Scientific (Scientific)
@@ -120,6 +121,9 @@ data Response errorData resultData = Response
     outcome :: Either (Error errorData) resultData
   }
   deriving stock (Eq, Show, Generic, Foldable, Functor, Traversable)
+
+instance Bifunctor Response where
+  bimap f g Response {..} = Response {outcome = bimap (fmap f) g outcome, ..}
 
 instance
   ( Aeson.FromJSON errorData,
