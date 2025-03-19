@@ -115,19 +115,19 @@ instance (Aeson.ToJSON params) => Aeson.ToJSON (Request params) where
 
 -- | A JSON-RPC 2.0 response object. It represents either a response
 -- to a non-notification request, or an error.
-data Response errorData result = Response
+data Response errorData resultData = Response
   { id :: RequestId,
-    outcome :: Either (Error errorData) result
+    outcome :: Either (Error errorData) resultData
   }
   deriving stock (Eq, Show, Generic, Foldable, Functor, Traversable)
 
 instance
   ( Aeson.FromJSON errorData,
     Typeable errorData,
-    Aeson.FromJSON result,
-    Typeable result
+    Aeson.FromJSON resultData,
+    Typeable resultData
   ) =>
-  Aeson.FromJSON (Response errorData result)
+  Aeson.FromJSON (Response errorData resultData)
   where
   parseJSON =
     Aeson.withObject objectName $ \o -> do
@@ -140,11 +140,11 @@ instance
           ]
       pure Response {..}
     where
-      objectName = "Response(" ++ show (typeRep $ Proxy @result) ++ ")"
+      objectName = "Response(" ++ show (typeRep $ Proxy @resultData) ++ ")"
 
 instance
-  (Aeson.ToJSON errorData, Aeson.ToJSON result) =>
-  Aeson.ToJSON (Response errorData result)
+  (Aeson.ToJSON errorData, Aeson.ToJSON resultData) =>
+  Aeson.ToJSON (Response errorData resultData)
   where
   toJSON Response {..} =
     Aeson.Object $
