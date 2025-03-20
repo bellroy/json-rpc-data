@@ -9,8 +9,8 @@
 
 module Data.Json.Rpc.Endpoint
   ( -- * Creating Endpoints
-    makeConcurrentEndpoint,
     makeEndpoint,
+    makeSerialEndpoint,
 
     -- * Creating Method Handlers
     MethodHandler (..),
@@ -42,23 +42,35 @@ import UnliftIO.Internals.Async (Flat (..), FlatApp (..), runFlat)
 import Witherable
 import Prelude hiding (id)
 
-makeConcurrentEndpoint ::
+-- | Join a collection of handlers of individual JSON-RPC methods.
+--
+-- This function should be a good default for most purposes. It
+-- supports both individual and batch requests, and concurrently
+-- invokes the handlers for each method. When processing a batch,
+-- requests for the same method are passed to the handler as a single
+-- collection.
+--
+-- /See:/ 'MethodHandler'
+makeEndpoint ::
   forall m.
   (MonadUnliftIO m) =>
   Map Text (MethodHandler m) ->
   Aeson.Value ->
   m (Maybe Aeson.Value)
-makeConcurrentEndpoint handlers value = withRunInIO $ \run ->
+makeEndpoint handlers value = withRunInIO $ \run ->
   let handlers' = hoistMethodHandler (FlatApp . FlatAction . run) <$> handlers
-   in runFlat $ makeEndpoint handlers' value
+   in runFlat $ makeSerialEndpoint handlers' value
 
-makeEndpoint ::
+-- | A variant of 'makeEndpoint' that does not run method handlers in
+-- parallel. You might want this if your method handlers do not safely
+-- run concurrently.
+makeSerialEndpoint ::
   forall f.
   (Applicative f) =>
   Map Text (MethodHandler f) ->
   Aeson.Value ->
   f (Maybe Aeson.Value)
-makeEndpoint handlers value = case value of
+makeSerialEndpoint handlers = \value -> case value of
   Aeson.Bool {} ->
     pure . Just . Aeson.toJSON $
       invalidRequest "Expected array or object, got boolean"
@@ -98,16 +110,6 @@ makeEndpoint handlers value = case value of
 
         -- If a batch is all notifications, and there were no errors,
         -- then we should return no result.
-        --
-        -- https://www.jsonrpc.org/specification#:~:text=all%20notifications
-        --
-        -- @
-        -- --> [
-        --         {"jsonrpc": "2.0", "method": "notify_sum", "params": [1,2,4]},
-        --         {"jsonrpc": "2.0", "method": "notify_hello", "params": [7]}
-        --     ]
-        -- <-- //Nothing is returned for all notification batches
-        -- @
         pure $
           if IntMap.null results
             then Nothing
@@ -120,11 +122,11 @@ makeEndpoint handlers value = case value of
 -- notifications should generate no response, and it is a GADT because
 -- a handler must work for any 'Witherable'.
 --
--- You are provided all the requests from a batch so that you can
--- consider the batch as a whole when planning to respond. For
--- example, you might want to prefetch relevant data for all requests
--- in a single database call, and refer to it as you handle each
--- request.
+-- 'makeEndpoint' and 'makeSerialEndpoint' return all arguments
+-- matching a method, so that you can consider them as a whole when
+-- planning to respond. For example, you might want to prefetch
+-- relevant data for all requests in a single database call, and refer
+-- to it as you handle each request.
 --
 -- __NOTE:__ Every 'Witherable' is 'Traversable' and therefore
 -- 'Foldable', so you can call 'Data.Foldable.toList' on the request
@@ -147,13 +149,21 @@ data MethodHandler f where
 -- | Apply a natural transformation to a 'MethodHandler'.
 --
 -- This is useful if you want to change the applicative or monad your
--- handlers run in. You probably won't need this unless you're doing
--- fancy things with transformers or effect systems.
+-- handlers run in. You'll know if you need this, but generally it
+-- comes up when you're doing fancy things with transformers or
+-- effects.
 hoistMethodHandler ::
   (forall a. f a -> g a) -> MethodHandler f -> MethodHandler g
 hoistMethodHandler nt (MethodHandler f) = MethodHandler (nt . f)
 
--- | traverseBatchConcurrently is to traverseBatch as mapConcurrently is to traverse
+-- | Lift a function that can process one request into a function that
+-- can process a request batch by concurrently processing every
+-- request in that batch.
+--
+-- This should be your default way of creating 'MethodHandler's unless
+-- you need to do specific optimisations (and must write the handler
+-- yourself) or your handler is not safe to run concurrently (and you
+-- should use 'traverseBatch' instead).
 traverseBatchConcurrently ::
   forall params errorData resultData t m.
   ( Witherable t,
@@ -171,6 +181,14 @@ traverseBatchConcurrently f t = withRunInIO $ \run ->
       (\reqId params -> FlatApp . FlatAction . run $ f reqId params)
       t
 
+-- | Lift a function that can handle one request into a function that
+-- can handle batch requests, by processing them one-at-a-time.
+--
+-- You might want this if you cannot safely run your request handler
+-- in parallel.
+--
+-- 'traverseBatch' is to 'traverseBatchConcurrently' as
+-- 'traverse' is to 'UnliftIO.Async.mapConcurrently'.
 traverseBatch ::
   forall params errorData resultData t f.
   ( Witherable t,
