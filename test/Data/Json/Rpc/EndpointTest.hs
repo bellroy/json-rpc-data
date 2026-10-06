@@ -1,3 +1,4 @@
+{-# LANGUAGE MultilineStrings #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
@@ -17,21 +18,25 @@ test_rpcCallPositional =
   [ goldenVsToJson "id 1" "test/golden/rpcCallPositional.id1.golden.json" $ do
       Just input <-
         pure . Aeson.decode $
-          "{ \"jsonrpc\": \"2.0\"\
-          \, \"method\": \"subtract\"\
-          \, \"params\": [42, 23]\
-          \, \"id\": 1\
-          \}"
+          """
+          { "jsonrpc": "2.0"
+          , "method": "subtract"
+          , "params": [42, 23]
+          , "id": 1
+          }
+          """
       Just res <- subtractPositionalEndpoint input
       pure res,
     goldenVsToJson "id 2" "test/golden/rpcCallPositional.id2.golden.json" $ do
       Just input <-
         pure . Aeson.decode $
-          "{ \"jsonrpc\": \"2.0\"\
-          \, \"method\": \"subtract\"\
-          \, \"params\": [23, 42]\
-          \, \"id\": 2\
-          \}"
+          """
+          { "jsonrpc": "2.0"
+          , "method": "subtract"
+          , "params": [23, 42]
+          , "id": 2
+          }
+          """
       Just res <- subtractPositionalEndpoint input
       pure res
   ]
@@ -41,21 +46,25 @@ test_rpcCallNamed =
   [ goldenVsToJson "id 3" "test/golden/rpcCallNamed.id3.golden.json" $ do
       Just input <-
         pure . Aeson.decode $
-          "{ \"jsonrpc\": \"2.0\"\
-          \, \"method\": \"subtract\"\
-          \, \"params\": {\"subtrahend\": 23, \"minuend\": 42}\
-          \, \"id\": 3\
-          \}"
+          """
+          { "jsonrpc": "2.0"
+          , "method": "subtract"
+          , "params": {"subtrahend": 23, "minuend": 42}
+          , "id": 3
+          }
+          """
       Just res <- subtractEndpoint input
       pure res,
     goldenVsToJson "id 4" "test/golden/rpcCallNamed.id4.golden.json" $ do
       Just input <-
         pure . Aeson.decode $
-          "{ \"jsonrpc\": \"2.0\"\
-          \, \"method\": \"subtract\"\
-          \, \"params\": {\"subtrahend\": 23, \"minuend\": 42}\
-          \, \"id\": 4\
-          \}"
+          """
+          { "jsonrpc": "2.0"
+          , "method": "subtract"
+          , "params": {"subtrahend": 23, "minuend": 42}
+          , "id": 4
+          }
+          """
       Just res <- subtractEndpoint input
       pure res
   ]
